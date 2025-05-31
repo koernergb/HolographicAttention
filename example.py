@@ -1,5 +1,5 @@
 import torch
-from code import HolographicAttention, TensorTrainAttention, compute_entanglement_entropy
+from holographic_attention import HolographicAttention, TensorTrainAttention, compute_entanglement_entropy
 
 def main():
     # Set random seed for reproducibility

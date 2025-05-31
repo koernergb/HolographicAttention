@@ -202,32 +202,31 @@ def compute_entanglement_entropy(attention_matrix, n_regions=2):
     # Normalize if not already a probability distribution
     if not torch.allclose(attention_matrix.sum(dim=-1), torch.ones_like(attention_matrix.sum(dim=-1))):
         attention_matrix = torch.softmax(attention_matrix, dim=-1)
-    
+
     seq_len = attention_matrix.shape[-1]
-    
-    # Split sequence into regions (simplest case: first half and second half)
     region_size = seq_len // n_regions
-    
     entropies = []
-    
-    # For each region
+
     for i in range(n_regions):
         region_start = i * region_size
         region_end = (i + 1) * region_size if i < n_regions - 1 else seq_len
-        
-        # Get submatrix for this region
         region_attn = attention_matrix[:, region_start:region_end, :]
-        
+
         # Calculate density matrix (simplified)
         density_matrix = region_attn @ region_attn.transpose(-2, -1)
-        
-        # Get eigenvalues
-        eigenvalues = torch.linalg.eigvalsh(density_matrix + 1e-10 * torch.eye(density_matrix.shape[-1]))
-        
-        # Calculate von Neumann entropy
-        entropy = -torch.sum(eigenvalues * torch.log(eigenvalues + 1e-10))
-        entropies.append(entropy.item())
-    
+        # Add larger regularization and ensure correct device/dtype
+        eps = 1e-5
+        eye = torch.eye(density_matrix.shape[-1], device=density_matrix.device, dtype=density_matrix.dtype)
+        try:
+            eigenvalues = torch.linalg.eigvalsh(density_matrix + eps * eye)
+            # Clamp eigenvalues to avoid log(0) or negative
+            eigenvalues = torch.clamp(eigenvalues, min=1e-8)
+            entropy = -torch.sum(eigenvalues * torch.log(eigenvalues))
+            entropies.append(entropy.item())
+        except Exception as e:
+            print(f"Warning: eigvalsh failed for region {i} (error: {e}). Setting entropy to NaN.")
+            entropies.append(float('nan'))
+
     return entropies
 
 def compare_model_efficiency():
